@@ -65,15 +65,53 @@ function buildHtmlEmail(snapshot) {
     `;
   }).join('');
 
+  // Zone Totals calculation
+  let totZoneVisits = 0;
+  let totZoneAmt = 0;
+  let totZoneOrders = 0;
+  let totZoneWeightedLpc = 0;
+  sortedZones.forEach(z => {
+    const v = z.total_visit || 0;
+    const a = z.total_amount || 0;
+    const o = z.total_order || 0;
+    const lpc = parseFloat(z.avg_lpc) || 0;
+    totZoneVisits += v;
+    totZoneAmt += a;
+    totZoneOrders += o;
+    totZoneWeightedLpc += (lpc * o);
+  });
+  const totZoneEco = totZoneVisits > 0 ? ((totZoneOrders / totZoneVisits) * 100).toFixed(1) + '%' : (kpis.eco?.value || '0.0%');
+  const totZoneAvgLpc = totZoneOrders > 0 ? (totZoneWeightedLpc / totZoneOrders).toFixed(1) : '0.0';
+
+  const zoneFootHtml = `
+    <tfoot>
+      <tr style="border-top: 2px solid #38bdf8; background: #0c1424;">
+        <td style="padding: 10px 12px; color: #38bdf8; font-weight: 800; font-size: 13px;">TOTAL</td>
+        <td style="padding: 10px 12px; color: #ffffff; text-align: right; font-weight: 800; font-size: 13px; font-family: monospace;">${totZoneVisits.toLocaleString()}</td>
+        <td style="padding: 10px 12px; color: #38bdf8; text-align: right; font-weight: 800; font-size: 13px; font-family: monospace;">${formatTaka(totZoneAmt)}</td>
+        <td style="padding: 10px 12px; text-align: right;">
+          <span style="display: inline-block; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 12px; background: rgba(56,189,248,0.2); color: #38bdf8;">${totZoneEco}</span>
+        </td>
+        <td style="padding: 10px 12px; color: #ffffff; text-align: right; font-weight: 800; font-size: 13px; font-family: monospace;">${totZoneAvgLpc}</td>
+      </tr>
+    </tfoot>
+  `;
+
   // Category Matrix header
   const matrixZoneThs = zoneColumns.map(z =>
     `<th style="padding: 8px 7px; color: #38bdf8; text-align: right; font-size: 10.5px; text-transform: uppercase; border-bottom: 2px solid #334155;">${zoneShort(z)}</th>`
   ).join('');
 
-  // Category Matrix rows
+  // Category Matrix rows & totals calculation
+  let catGrandTotal = 0;
+  const catZoneTotals = {};
+  zoneColumns.forEach(z => { catZoneTotals[z] = 0; });
+
   const categoryRowsHtml = categories.map((cat, i) => {
+    catGrandTotal += (cat.amount || 0);
     const zoneCells = zoneColumns.map(z => {
       const val = (cat.zones && cat.zones[z]) || 0;
+      catZoneTotals[z] += val;
       const valStr = val > 0 ? formatTaka(val) : '—';
       const color = val > 0 ? '#f1f5f9' : '#64748b';
       return `<td style="padding: 7px 7px; text-align: right; font-size: 11.5px; color: ${color}; font-family: monospace;">${valStr}</td>`;
@@ -90,6 +128,23 @@ function buildHtmlEmail(snapshot) {
       </tr>
     `;
   }).join('');
+
+  const catZoneFootCells = zoneColumns.map(z => {
+    const val = catZoneTotals[z] || 0;
+    return `<td style="padding: 9px 7px; text-align: right; font-size: 12px; font-weight: 800; color: #f1f5f9; font-family: monospace;">${val > 0 ? formatTaka(val) : '—'}</td>`;
+  }).join('');
+
+  const categoryFootHtml = `
+    <tfoot>
+      <tr style="border-top: 2px solid #38bdf8; background: #0c1424;">
+        <td style="padding: 9px 6px; color: #38bdf8; font-size: 11px; text-align: center; font-weight: 800;">∑</td>
+        <td style="padding: 9px 8px; color: #38bdf8; font-weight: 800; font-size: 12.5px;">TOTAL</td>
+        ${catZoneFootCells}
+        <td style="padding: 9px 7px; color: #38bdf8; text-align: right; font-weight: 800; font-size: 12.5px; font-family: monospace;">${formatTaka(catGrandTotal)}</td>
+        <td style="padding: 9px 7px; color: #a78bfa; text-align: right; font-weight: 800; font-size: 12px; font-family: monospace;">100%</td>
+      </tr>
+    </tfoot>
+  `;
 
   return `
 <!DOCTYPE html>
@@ -210,6 +265,7 @@ function buildHtmlEmail(snapshot) {
               <tbody>
                 ${zoneRowsHtml}
               </tbody>
+              ${zoneFootHtml}
             </table>
           </div>
         </td>
@@ -233,6 +289,7 @@ function buildHtmlEmail(snapshot) {
               <tbody>
                 ${categoryRowsHtml}
               </tbody>
+              ${categoryFootHtml}
             </table>
           </div>
         </td>
