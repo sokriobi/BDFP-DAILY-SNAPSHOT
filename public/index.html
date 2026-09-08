@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BDFP · Executive Daily Snapshot</title>
+  <meta name="description" content="BDFP Aarong Dairy CEO Executive Daily Snapshot — Live Analytics Dashboard" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=15" />
+</head>
+<body>
+
+<!-- ═══════════════════ TOP NAVBAR ═══════════════════ -->
+<header class="app-header">
+  <div class="header-brand">
+    <img src="assets/bdfp logo.png" alt="Aarong Dairy BDFP Logo" class="brand-logo" />
+    <div class="brand-divider"></div>
+    <div class="brand-info">
+      <div class="brand-title-row">
+        <h1 class="brand-name">BDFP</h1>
+        <span class="header-tag">EXECUTIVE</span>
+      </div>
+      <span class="brand-tagline">CEO Daily Operations &amp; Performance Snapshot</span>
+    </div>
+  </div>
+
+  <div class="header-controls">
+    <!-- Live Status Pill -->
+    <div class="live-indicator-pill" id="livePill" title="Live Auto-Sync Active">
+      <span class="live-pulse"></span>
+      <span class="live-text">AUTO-SYNC</span>
+    </div>
+
+    <!-- Date Picker -->
+    <div class="header-date-picker">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <input type="date" id="reportDatePicker" class="date-input" title="Select Report Date" />
+    </div>
+
+    <!-- Refresh -->
+    <button class="btn btn-icon" id="btnRefresh" onclick="refreshDashboard()" title="Refresh Live Data">
+      <svg class="refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      <span>Refresh</span>
+    </button>
+  </div>
+</header>
+
+<main class="app-main">
+
+  <!-- ═══ CEO / EXECUTIVE DAILY SNAPSHOT ═══ -->
+  <section class="ceo-snapshot-panel" id="ceoSnapshot">
+    <div class="section-banner">
+      <div class="banner-title-wrap">
+        <span class="banner-badge">EXECUTIVE DASHBOARD</span>
+        <h2 class="banner-heading">BDFP — DAILY SNAPSHOT</h2>
+      </div>
+      <div class="banner-meta">
+        <span class="date-badge" id="snapshotDateLabel">—</span>
+        <span class="last-sync-text" id="lastSyncLabel">Updated just now</span>
+      </div>
+    </div>
+
+    <!-- 5 KPI Cards -->
+    <div class="ceo-kpi-grid">
+      <!-- Total Outlet -->
+      <div class="kpi-card card-outlet">
+        <div class="kpi-header">
+          <span class="kpi-title">TOTAL OUTLET</span>
+          <div class="kpi-icon-wrap icon-cyan">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+        </div>
+        <div class="kpi-metric-wrap">
+          <div class="kpi-metric" id="kpiOutletVal">—</div>
+          <div class="kpi-sub-badge badge-green" id="kpiOutletSub">New: +— (Last 7 Days)</div>
+        </div>
+      </div>
+
+      <!-- Total Sales Representative -->
+      <div class="kpi-card card-sr">
+        <div class="kpi-header">
+          <span class="kpi-title">TOTAL SALES REPRESENTATIVE</span>
+          <div class="kpi-icon-wrap icon-blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+        </div>
+        <div class="kpi-metric-wrap">
+          <div class="kpi-metric" id="kpiSrVal">—</div>
+          <div class="kpi-split-sub">
+            <span class="kpi-pill pill-active" id="kpiSrActive">Checked in: —</span>
+            <span class="kpi-pill-separator">|</span>
+            <span class="kpi-pill pill-inactive" id="kpiSrInactive">Not Checked in: —</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Total Visited Outlet -->
+      <div class="kpi-card card-visit">
+        <div class="kpi-header">
+          <span class="kpi-title">TOTAL VISITED OUTLET</span>
+          <div class="kpi-icon-wrap icon-amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+        </div>
+        <div class="kpi-metric-wrap">
+          <div class="kpi-metric" id="kpiVisitVal">—</div>
+          <div class="kpi-sub-badge badge-amber" id="kpiVisitSub">Unique Visited Outlet: —</div>
+        </div>
+      </div>
+
+      <!-- Order Amount -->
+      <div class="kpi-card card-order">
+        <div class="kpi-header">
+          <span class="kpi-title">ORDER AMOUNT</span>
+          <div class="kpi-icon-wrap icon-emerald">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+        </div>
+        <div class="kpi-metric-wrap">
+          <div class="kpi-metric" id="kpiOrderVal">—</div>
+          <div class="kpi-sub-badge badge-blue" id="kpiOrderSub">Total number of MEMO: —</div>
+        </div>
+      </div>
+
+      <!-- Strike Rate -->
+      <div class="kpi-card card-eco">
+        <div class="kpi-header">
+          <span class="kpi-title">STRIKE RATE</span>
+          <div class="kpi-icon-wrap icon-purple">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+        </div>
+        <div class="kpi-metric-wrap">
+          <div class="kpi-metric" id="kpiEcoVal">—</div>
+          <div class="kpi-sub-badge badge-purple" id="kpiEcoSub">Productive Visit: —</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone + Category Matrix -->
+    <div class="ceo-analytics-grid">
+      <!-- Zone-Wise Performance Table -->
+      <div class="analytics-card zone-perf-card">
+        <div class="analytics-card-header">
+          <div class="card-title-group">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            <h3 class="card-title">ZONE-WISE PERFORMANCE</h3>
+          </div>
+          <span class="card-subtitle">Regional Rollup &amp; Effectiveness</span>
+        </div>
+        <div class="table-responsive zone-table-wrap">
+          <table class="zone-table" id="zoneTable">
+            <thead>
+              <tr>
+                <th class="th-zone-name">Zone</th>
+                <th class="th-num">Total Visit</th>
+                <th class="th-num">Total Order Amount</th>
+                <th class="th-num">Strike Rate</th>
+                <th class="th-num">Avg LPC</th>
+              </tr>
+            </thead>
+            <tbody id="zoneTableBody">
+              <tr class="table-placeholder"><td colspan="5">Loading zone analytics...</td></tr>
+            </tbody>
+            <tfoot id="zoneTableFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Category × Zone Matrix -->
+      <div class="analytics-card category-card">
+        <div class="analytics-card-header">
+          <div class="card-title-group">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <h3 class="card-title">CATEGORY × ZONE MATRIX</h3>
+          </div>
+          <span class="card-subtitle" id="categorySubtitle">Order Amount by Category &amp; Zone</span>
+        </div>
+        <div class="matrix-table-wrap">
+          <table class="matrix-table" id="categoryTable">
+            <thead>
+              <tr id="matrixHeaderRow">
+                <th class="th-mat-rank">#</th>
+                <th class="th-mat-name">Category</th>
+                <!-- Zone columns injected by JS -->
+              </tr>
+            </thead>
+            <tbody id="categoryTableBody">
+              <tr class="table-placeholder"><td colspan="8">Loading matrix...</td></tr>
+            </tbody>
+            <tfoot id="categoryTableFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
+</main>
+
+<footer class="app-footer">
+  <div class="footer-content">
+    <span>© 2026 <strong>BDFP · Aarong Dairy</strong> · Executive Intelligence Platform</span>
+    <span class="footer-sep">•</span>
+    <span>Connected to Sokrio Enterprise Cloud</span>
+  </div>
+</footer>
+
+<script src="app.js?v=13"></script>
+</body>
+</html>
