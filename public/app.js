@@ -251,10 +251,10 @@ function renderCategoryChart(categories, zoneColumns) {
       th.textContent = zoneShort(z);
       headerRow.appendChild(th);
     });
-    // Then Total & Share at the end
-    ['Total', 'Share'].forEach(label => {
+    // Then Total Carton, Total & Share at the end
+    [{label: 'Total Carton', cls: 'th-mat-num th-mat-ctn'}, {label: 'Total', cls: 'th-mat-num'}, {label: 'Share', cls: 'th-mat-num'}].forEach(({label, cls}) => {
       const th = document.createElement('th');
-      th.className = 'th-mat-num';
+      th.className = cls;
       th.textContent = label;
       headerRow.appendChild(th);
     });
@@ -288,6 +288,7 @@ function renderCategoryChart(categories, zoneColumns) {
       return `<td class="td-mat-zone" style="background:${bg}" title="${z}: ${fmtAmt(val)}">${fmtAmt(val)}</td>`;
     }).join('');
 
+    const ctnVal = cat.total_carton != null ? Math.round(cat.total_carton).toLocaleString() : '—';
     return `
       <tr>
         <td class="td-mat-rank">${i + 1}</td>
@@ -296,6 +297,7 @@ function renderCategoryChart(categories, zoneColumns) {
           ${escapeHtml(cat.category)}
         </td>
         ${zoneCells}
+        <td class="td-mat-ctn">${ctnVal}</td>
         <td class="td-mat-total">${fmtAmt(cat.amount)}</td>
         <td class="td-mat-pct"><span style="color:${color};font-weight:800">${pct}%</span></td>
       </tr>
@@ -306,11 +308,13 @@ function renderCategoryChart(categories, zoneColumns) {
   const tfoot = document.getElementById('categoryTableFoot');
   if (tfoot) {
     let grandTotal = 0;
+    let grandCarton = 0;
     const zoneTotals = {};
     zones.forEach(z => { zoneTotals[z] = 0; });
 
     sorted.forEach(cat => {
       grandTotal += (cat.amount || 0);
+      grandCarton += (cat.total_carton || 0);
       zones.forEach(z => {
         zoneTotals[z] += ((cat.zones && cat.zones[z]) || 0);
       });
@@ -325,6 +329,7 @@ function renderCategoryChart(categories, zoneColumns) {
         <td class="td-mat-rank" style="font-weight:800;">∑</td>
         <td class="td-mat-name" style="font-weight:800; color:var(--brand-dark);">TOTAL</td>
         ${zoneTotalCells}
+        <td class="td-mat-ctn" style="font-weight:800; color:var(--brand-dark);">${Math.round(grandCarton).toLocaleString()}</td>
         <td class="td-mat-total" style="color:var(--brand-dark); font-weight:800;">${fmtAmt(grandTotal)}</td>
         <td class="td-mat-pct"><span style="color:var(--brand-dark); font-weight:800;">100%</span></td>
       </tr>

@@ -107,14 +107,17 @@ function buildHtmlEmail(snapshot) {
   const matrixZoneThs = zoneColumns.map(z =>
     `<th style="padding: 9px 8px; color: #0284c7; text-align: right; font-size: 11px; font-weight: 800; text-transform: uppercase; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">${zoneShort(z)}</th>`
   ).join('');
+  const matrixCtnTh = `<th style="padding: 9px 8px; color: #7c3aed; text-align: right; font-size: 11px; font-weight: 800; text-transform: uppercase; border-bottom: 2px solid #cbd5e1; background: #f5f3ff;">Total CTN</th>`;
 
   // Category Matrix rows & totals calculation
   let catGrandTotal = 0;
+  let catGrandCarton = 0;
   const catZoneTotals = {};
   zoneColumns.forEach(z => { catZoneTotals[z] = 0; });
 
   const categoryRowsHtml = categories.map((cat, i) => {
     catGrandTotal += (cat.amount || 0);
+    catGrandCarton += (cat.total_carton || 0);
     const zoneCells = zoneColumns.map(z => {
       const val = (cat.zones && cat.zones[z]) || 0;
       catZoneTotals[z] += val;
@@ -124,6 +127,7 @@ function buildHtmlEmail(snapshot) {
       return `<td style="padding: 8px 8px; text-align: right; font-size: 12px; font-weight: ${val > 0 ? '600' : 'normal'}; color: ${color}; font-family: monospace; background: ${cellBg};">${valStr}</td>`;
     }).join('');
 
+    const ctnDisplay = cat.total_carton != null ? Math.round(cat.total_carton).toLocaleString() : '—';
     const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fbff';
     return `
       <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBg};">
@@ -133,6 +137,7 @@ function buildHtmlEmail(snapshot) {
           ${cat.category}
         </td>
         ${zoneCells}
+        <td style="padding: 8px 8px; color: #7c3aed; text-align: right; font-weight: 800; font-size: 12.5px; font-family: monospace; background: #f5f3ff;">${ctnDisplay}</td>
         <td style="padding: 8px 8px; color: #0284c7; text-align: right; font-weight: 800; font-size: 12.5px; font-family: monospace; background: #f0f9ff;">${formatTaka(cat.amount)}</td>
         <td style="padding: 8px 8px; color: #7c3aed; text-align: right; font-weight: 800; font-size: 12px; font-family: monospace;">${cat.percentage || 0}%</td>
       </tr>
@@ -150,6 +155,7 @@ function buildHtmlEmail(snapshot) {
         <td style="padding: 10px 6px; color: #0369a1; font-size: 12px; text-align: center; font-weight: 800;">∑</td>
         <td style="padding: 10px 10px; color: #0369a1; font-weight: 800; font-size: 13px;">TOTAL</td>
         ${catZoneFootCells}
+        <td style="padding: 10px 8px; color: #7c3aed; text-align: right; font-weight: 800; font-size: 13px; font-family: monospace; background: #ede9fe;">${Math.round(catGrandCarton).toLocaleString()}</td>
         <td style="padding: 10px 8px; color: #0284c7; text-align: right; font-weight: 800; font-size: 13px; font-family: monospace; background: #bae6fd;">${formatTaka(catGrandTotal)}</td>
         <td style="padding: 10px 8px; color: #6d28d9; text-align: right; font-weight: 800; font-size: 12px; font-family: monospace;">100%</td>
       </tr>
@@ -257,18 +263,18 @@ function buildHtmlEmail(snapshot) {
         </td>
       </tr>
 
-      <!-- Zone-Wise Performance Table -->
+      <!-- Region-Wise Performance Table -->
       <tr>
         <td style="padding: 12px 18px 16px 18px;">
           <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
             <div style="font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;">
-              🗺️ ZONE-WISE PERFORMANCE
+              🗺️ REGION-WISE PERFORMANCE
               <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: none; margin-left: 8px;">Regional Rollup &amp; Effectiveness</span>
             </div>
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
               <thead>
                 <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-                  <th align="left" style="padding: 9px 12px; color: #475569; font-size: 11px; font-weight: 800; text-transform: uppercase;">Zone</th>
+                  <th align="left" style="padding: 9px 12px; color: #475569; font-size: 11px; font-weight: 800; text-transform: uppercase;">Region</th>
                   <th align="right" style="padding: 9px 12px; color: #475569; font-size: 11px; font-weight: 800; text-transform: uppercase;">Total Visit</th>
                   <th align="right" style="padding: 9px 12px; color: #475569; font-size: 11px; font-weight: 800; text-transform: uppercase;">Total Order Amount</th>
                   <th align="right" style="padding: 9px 12px; color: #475569; font-size: 11px; font-weight: 800; text-transform: uppercase;">Strike Rate</th>
@@ -284,13 +290,13 @@ function buildHtmlEmail(snapshot) {
         </td>
       </tr>
 
-      <!-- Category × Zone Matrix Table -->
+      <!-- Category × Region Matrix Table -->
       <tr>
         <td style="padding: 0 18px 22px 18px;">
           <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; overflow-x: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
             <div style="font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;">
-              📊 CATEGORY × ZONE MATRIX
-              <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: none; margin-left: 8px;">Order Amount by Category &amp; Zone</span>
+              📊 CATEGORY × REGION MATRIX
+              <span style="font-size: 11px; font-weight: 500; color: #64748b; text-transform: none; margin-left: 8px;">Order Amount by Category &amp; Region</span>
             </div>
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
               <thead>
@@ -298,6 +304,7 @@ function buildHtmlEmail(snapshot) {
                   <th width="26" style="padding: 9px 6px; color: #64748b; font-size: 10.5px; font-weight: 800;">#</th>
                   <th align="left" style="padding: 9px 10px; color: #475569; font-size: 11px; font-weight: 800; text-transform: uppercase;">Category</th>
                   ${matrixZoneThs}
+                  ${matrixCtnTh}
                   <th align="right" style="padding: 9px 8px; color: #0284c7; font-size: 11px; font-weight: 800; text-transform: uppercase; border-bottom: 2px solid #cbd5e1; background: #e0f2fe;">Total</th>
                   <th align="right" style="padding: 9px 8px; color: #7c3aed; font-size: 11px; font-weight: 800; text-transform: uppercase; border-bottom: 2px solid #cbd5e1;">Share</th>
                 </tr>

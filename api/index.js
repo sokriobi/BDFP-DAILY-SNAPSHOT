@@ -403,7 +403,7 @@ async function generateSnapshot(date, forceFresh = false) {
       const hIdx = findHeaderRow(rows, ['Employee Code', 'Tracking ID']);
       if (hIdx !== -1) {
         const headers = rows[hIdx];
-        let tidCol = 1, catCol = 12, amtCol = 18, tCodeCol = 22, tNameCol = 23;
+        let tidCol = 1, catCol = 12, amtCol = 18, tCodeCol = 22, tNameCol = 23, ctnCol = -1;
         headers.forEach((h, i) => {
           const n = String(h || '').trim().toLowerCase().replace(/\s+/g, ' ');
           if (n === 'tracking id' || n.includes('tracking id')) tidCol = i;
@@ -411,6 +411,7 @@ async function generateSnapshot(date, forceFresh = false) {
           if (n === 'amount') amtCol = i;
           if (n === 'buyer territory code' || n === 'territory code') tCodeCol = i;
           if (n === 'buyer territory name' || n === 'territory name') tNameCol = i;
+          if (n === 'ctn') ctnCol = i;
         });
 
         rows.slice(hIdx + 1).forEach(r => {
@@ -433,12 +434,14 @@ async function generateSnapshot(date, forceFresh = false) {
           }
 
           // Category matrix
+          const ctn = ctnCol !== -1 ? (parseFloat(r[ctnCol]) || 0) : 0;
           if (!categoryMap[cat]) {
-            categoryMap[cat] = { name: cat, amount: 0, count: 0, zones: {} };
+            categoryMap[cat] = { name: cat, amount: 0, count: 0, total_carton: 0, zones: {} };
             targetOrder.forEach(z => { categoryMap[cat].zones[z] = 0; });
           }
           categoryMap[cat].amount += amt;
           categoryMap[cat].count++;
+          categoryMap[cat].total_carton += ctn;
           if (targetOrder.includes(zName)) {
             categoryMap[cat].zones[zName] = (categoryMap[cat].zones[zName] || 0) + amt;
           }
@@ -507,6 +510,7 @@ async function generateSnapshot(date, forceFresh = false) {
     .map(c => ({
       category: c.name,
       amount: c.amount,
+      total_carton: Math.round(c.total_carton || 0),
       percentage: Math.round((c.amount / totalCatAmt) * 100),
       zones: c.zones || {}
     }))

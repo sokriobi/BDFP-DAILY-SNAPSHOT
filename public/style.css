@@ -472,7 +472,9 @@ body {
 .td-mat-name { font-weight: 600; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .cat-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
 .td-mat-total { text-align: right; font-family: var(--font-mono); font-weight: 800; }
-.td-mat-pct { text-align: right; font-family: var(--font-mono); font-weight: 700; min-width: 52px; }
+.td-mat-pct   { text-align: right; font-family: var(--font-mono); font-weight: 700; min-width: 52px; }
+.td-mat-ctn   { text-align: right; font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #7c3aed; min-width: 80px; }
+.th-mat-ctn   { text-align: right; min-width: 80px; color: #7c3aed !important; font-weight: 800; }
 .td-mat-zone { text-align: right; font-family: var(--font-mono); font-size: 0.77rem; font-weight: 600; color: var(--text-secondary); border-radius: 4px; }
 
 .table-placeholder td { text-align: center; color: var(--text-muted); font-size: 0.82rem; padding: 28px; }
