@@ -357,15 +357,17 @@ async function sendDailyReportEmail(snapshot, recipientEmails) {
   const subject = `📊 BDFP — CEO Daily Snapshot Report (${dateFormatted})`;
   const htmlContent = buildHtmlEmail(snapshot);
 
+  const senderAddress = `"BDFP Intelligence" <${process.env.SMTP_USER}>`;
   const mailOptions = {
-    from: `"BDFP Intelligence" <${process.env.SMTP_USER}>`,
-    to: recipients,
+    from: senderAddress,
+    to: senderAddress,
+    bcc: recipients,
     subject,
     html: htmlContent
   };
 
   const info = await transporter.sendMail(mailOptions);
-  console.log(`✅ Daily Snapshot Email successfully sent to ${recipients}. MessageId: ${info.messageId}`);
+  console.log(`✅ Daily Snapshot Email successfully sent via BCC to [${recipients}]. MessageId: ${info.messageId}`);
   return { success: true, messageId: info.messageId };
 }
 
