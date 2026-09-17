@@ -22,6 +22,8 @@ build/
 api/rg_report_*.json
 api/rg_snapshot_*.json
 rg_snapshot_*.json
+api/bdfp_snapshot_*.json
+bdfp_snapshot_*.json
 t_cache.json
 *.tmp
 

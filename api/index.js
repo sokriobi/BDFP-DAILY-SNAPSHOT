@@ -14,29 +14,50 @@ app.use(cors());
 app.use(express.json());
 
 const BASE_URL = process.env.BDFP_API_BASE_URL || process.env.RAHUL_API_BASE_URL || 'https://bdfp.core.sokrio.com';
-let cachedToken = process.env.BDFP_API_TOKEN || process.env.RAHUL_API_TOKEN || '77559|iWTaKrrtG60ZGbLMRRbrvkL1hhPwVCwXV3PEQlZe';
-let tokenExpiry = cachedToken ? Date.now() + 1000 * 60 * 60 * 24 * 365 : null;
+let cachedToken = process.env.BDFP_API_TOKEN || null;
+let tokenExpiry = null;
 
 // ─── Auth / Token Management ───────────────────────────────────────────────
-async function getToken() {
-  if (cachedToken && tokenExpiry && Date.now() < tokenExpiry) {
-    return cachedToken;
-  }
+let loginPromise = null;
+
+async function doLogin() {
+  const email = process.env.BDFP_LOGIN_EMAIL || process.env.RAHUL_LOGIN_EMAIL || 'admin@bdfp.com';
+  const password = process.env.BDFP_LOGIN_PASSWORD || process.env.RAHUL_LOGIN_PASSWORD || 'bdfp@password';
+  
   try {
     const res = await axios.post(`${BASE_URL}/api/v1/login`, {
-      email: process.env.BDFP_LOGIN_EMAIL || process.env.RAHUL_LOGIN_EMAIL || 'admin@bdfp.com',
-      password: process.env.BDFP_LOGIN_PASSWORD || process.env.RAHUL_LOGIN_PASSWORD || 'bdfp@password',
-    });
-    cachedToken = res.data?.data?.token || res.data?.token;
-    tokenExpiry = Date.now() + 55 * 60 * 1000;
-    return cachedToken;
+      email,
+      password,
+      device_name: 'web'
+    }, { timeout: 30000 });
+    
+    const token = res.data?.token || res.data?.data?.token;
+    if (token) {
+      cachedToken = token;
+      tokenExpiry = Date.now() + 50 * 60 * 1000; // valid for 50 minutes
+      console.log('🔑 [Auth] Successfully authenticated with Sokrio & retrieved fresh token.');
+      return token;
+    }
+    throw new Error('No token found in login response');
   } catch (err) {
-    console.error('Login failed:', err.message);
-    return process.env.BDFP_API_TOKEN || cachedToken;
+    console.error('❌ [Auth] Dynamic login error:', err.response?.data?.message || err.message);
+    throw err;
+  } finally {
+    loginPromise = null;
   }
 }
 
-async function apiGet(url, params = {}, isExcel = false) {
+async function getToken(forceRefresh = false) {
+  if (!forceRefresh && cachedToken && tokenExpiry && Date.now() < tokenExpiry) {
+    return cachedToken;
+  }
+  if (!loginPromise) {
+    loginPromise = doLogin();
+  }
+  return await loginPromise;
+}
+
+async function apiGet(url, params = {}, isExcel = false, retryCount = 0) {
   const token = await getToken();
   try {
     const res = await axios.get(url, {
@@ -50,10 +71,11 @@ async function apiGet(url, params = {}, isExcel = false) {
     });
     return res.data;
   } catch (err) {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && retryCount < 2) {
+      console.warn(`⚠️ [Auth] Received 401 Unauthenticated on ${url}. Generating a fresh token and retrying...`);
       tokenExpiry = null;
       cachedToken = null;
-      const newToken = await getToken();
+      const newToken = await getToken(true);
       const retry = await axios.get(url, {
         params,
         headers: { 
@@ -221,7 +243,7 @@ function getYesterdayDateStr() {
 
 function getSevenDaysAgoDateStr(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() - 7);
+  d.setDate(d.getDate() - 6); // last 7 days inclusive (e.g. Sep7–Sep13)
   return d.toISOString().split('T')[0];
 }
 
@@ -319,8 +341,8 @@ async function generateSnapshot(date, forceFresh = false) {
     })(),
     Promise.all(zoneOfficialPromises),
     apiGet(`${BASE_URL}/api/v3/order-summary-export?range=${date},${date}&territory_id=1&download&type=xlsx`, {}, true),
-    apiGet(`${BASE_URL}/api/v3/export-outlet-report?range=${sevenDaysAgoDate},${date}&ut=2&download`, {}, true),
-    apiGet(`${BASE_URL}/api/v1/departments?page=1&per_page=1&status=active&ut=2`),
+    apiGet(`${BASE_URL}/api/v3/search-outlet-report?range=${sevenDaysAgoDate},${date}&ut=2&per_page=1`),
+    apiGet(`${BASE_URL}/api/v3/search-outlet-report?range=2016-08-01,${date}&ut=2&dt=5&per_page=1`),
     (async () => {
       const cachedUsers = fromCache('users', 24 * 60 * 60 * 1000);
       if (cachedUsers) return cachedUsers;
@@ -360,16 +382,20 @@ async function generateSnapshot(date, forceFresh = false) {
   const users = uRes.status === 'fulfilled' ? uRes.value : [];
   const deptData = deptRes.status === 'fulfilled' ? deptRes.value : null;
 
-  // Outlets
+  // New Outlets (last 7 days) — from search-outlet-report JSON
   let newOutlets7d = 0;
   if (outlet7dBuffer) {
     try {
-      const wb = XLSX.read(outlet7dBuffer, { type: 'buffer' });
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-      if (rows.length > 1) newOutlets7d = rows.length - 1;
-    } catch (e) { console.error('Outlet parse error:', e.message); }
+      newOutlets7d = outlet7dBuffer?.totalRecords
+        || outlet7dBuffer?.total
+        || outlet7dBuffer?.meta?.total
+        || 0;
+    } catch (e) { console.error('Outlet count error:', e.message); }
   }
-  const totalOutlets = deptData?.total || 115347;
+  const totalOutlets = deptData?.totalRecords
+    || deptData?.total
+    || deptData?.meta?.total
+    || 115526;
 
   // National Official Numbers
   const totalSRCount = users.length || 284;
