@@ -41,6 +41,10 @@ function checkAuth() {
   } else {
     if (loginScreen) loginScreen.classList.remove('hidden');
     if (btnLogout) btnLogout.style.display = 'none';
+    const emailInput = document.getElementById('loginEmail');
+    const passwordInput = document.getElementById('loginPassword');
+    if (emailInput) emailInput.value = '';
+    if (passwordInput) passwordInput.value = '';
     return false;
   }
 }

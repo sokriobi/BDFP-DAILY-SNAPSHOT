@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=16" />
+  <link rel="stylesheet" href="style.css?v=17" />
 </head>
 <body>
 
@@ -63,14 +63,18 @@
       <p class="login-subtitle">Sign in to access CEO &amp; Executive Operations Snapshot</p>
     </div>
 
-    <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+    <form class="login-form" id="loginForm" onsubmit="handleLogin(event)" autocomplete="off">
+      <!-- Hidden dummy inputs to capture aggressive browser autofill -->
+      <input type="text" name="prevent_autofill_user" id="prevent_autofill_user" style="position:absolute; top:-9999px; left:-9999px;" tabindex="-1" autocomplete="off" />
+      <input type="password" name="prevent_autofill_pwd" id="prevent_autofill_pwd" style="position:absolute; top:-9999px; left:-9999px;" tabindex="-1" autocomplete="new-password" />
+
       <div id="loginAlert" class="login-alert" style="display: none;"></div>
 
       <div class="form-group">
         <label for="loginEmail" class="form-label">Email Address</label>
         <div class="input-with-icon">
           <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          <input type="email" id="loginEmail" class="form-input" placeholder="admin@bdfp.com" required autocomplete="username" />
+          <input type="email" id="loginEmail" name="bdfp_auth_email_field" class="form-input" placeholder="admin@bdfp.com" required autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" />
         </div>
       </div>
 
@@ -78,7 +82,7 @@
         <label for="loginPassword" class="form-label">Password</label>
         <div class="input-with-icon">
           <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <input type="password" id="loginPassword" class="form-input" placeholder="••••••••••••" required autocomplete="current-password" />
+          <input type="password" id="loginPassword" name="bdfp_auth_pass_field" class="form-input" placeholder="••••••••••••" required autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" />
           <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility()" title="Toggle password visibility">
             <svg id="pwdEyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
@@ -261,6 +265,6 @@
   </div>
 </footer>
 
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>
