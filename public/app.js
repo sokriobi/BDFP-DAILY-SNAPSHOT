@@ -24,11 +24,164 @@ const PALETTE = [
 
 const CAT_ICONS = ['🥛', '🧈', '🥛', '🍫', '🥭', '☕', '🍓', '🍦', '🍶', '📦'];
 
+// ── AUTHENTICATION & SECURITY ─────────────────────────────────────────
+const AUTH_KEY = 'bdfp_auth_session';
+const VALID_EMAILS = ['admin@bdfp.com', 'admin@bdfp.comm'];
+const VALID_PASSWORD = 'bdfp@password';
+
+function checkAuth() {
+  const isAuth = sessionStorage.getItem(AUTH_KEY) === 'true' || localStorage.getItem(AUTH_KEY) === 'true';
+  const loginScreen = document.getElementById('loginScreen');
+  const btnLogout = document.getElementById('btnLogout');
+
+  if (isAuth) {
+    if (loginScreen) loginScreen.classList.add('hidden');
+    if (btnLogout) btnLogout.style.display = 'inline-flex';
+    return true;
+  } else {
+    if (loginScreen) loginScreen.classList.remove('hidden');
+    if (btnLogout) btnLogout.style.display = 'none';
+    return false;
+  }
+}
+
+function handleLogin(e) {
+  if (e) e.preventDefault();
+  const emailInput = document.getElementById('loginEmail');
+  const passwordInput = document.getElementById('loginPassword');
+  const alertEl = document.getElementById('loginAlert');
+  const btnSubmit = document.getElementById('btnLoginSubmit');
+
+  const email = (emailInput?.value || '').trim().toLowerCase();
+  const password = (passwordInput?.value || '');
+
+  if (VALID_EMAILS.includes(email) && password === VALID_PASSWORD) {
+    if (alertEl) {
+      alertEl.className = 'login-alert success';
+      alertEl.innerHTML = '<span>✅ Login successful! Loading dashboard...</span>';
+      alertEl.style.display = 'flex';
+    }
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = '<span>Authenticating...</span>';
+    }
+
+    sessionStorage.setItem(AUTH_KEY, 'true');
+    localStorage.setItem(AUTH_KEY, 'true');
+
+    setTimeout(() => {
+      const loginScreen = document.getElementById('loginScreen');
+      if (loginScreen) loginScreen.classList.add('hidden');
+      const btnLogout = document.getElementById('btnLogout');
+      if (btnLogout) btnLogout.style.display = 'inline-flex';
+
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<span>Sign In to Dashboard</span>';
+      }
+      if (alertEl) alertEl.style.display = 'none';
+
+      initDashboard();
+    }, 600);
+  } else {
+    if (alertEl) {
+      alertEl.className = 'login-alert error';
+      alertEl.innerHTML = '<span>❌ Invalid email or password. Please try again.</span>';
+      alertEl.style.display = 'flex';
+    }
+    if (passwordInput) {
+      passwordInput.value = '';
+      passwordInput.focus();
+    }
+  }
+}
+
+function handleLogout() {
+  sessionStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(AUTH_KEY);
+  const loginScreen = document.getElementById('loginScreen');
+  const emailInput = document.getElementById('loginEmail');
+  const passwordInput = document.getElementById('loginPassword');
+  const alertEl = document.getElementById('loginAlert');
+  const btnLogout = document.getElementById('btnLogout');
+
+  if (passwordInput) passwordInput.value = '';
+  if (emailInput) emailInput.value = '';
+  if (alertEl) alertEl.style.display = 'none';
+  if (btnLogout) btnLogout.style.display = 'none';
+  if (loginScreen) loginScreen.classList.remove('hidden');
+}
+
+function togglePasswordVisibility() {
+  const pwdInput = document.getElementById('loginPassword');
+  const eyeIcon = document.getElementById('pwdEyeIcon');
+  if (!pwdInput) return;
+
+  if (pwdInput.type === 'password') {
+    pwdInput.type = 'text';
+    if (eyeIcon) {
+      eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    }
+  } else {
+    pwdInput.type = 'password';
+    if (eyeIcon) {
+      eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+  }
+}
+
+// ── DISABLE RIGHT-CLICK & DEVTOOLS / INSPECT ───────────────────────────
+(function disableDevToolsAndInspect() {
+  // Disable context menu (right click)
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    return false;
+  });
+
+  // Disable common developer shortcut keys
+  document.addEventListener('keydown', (e) => {
+    // F12
+    if (e.key === 'F12' || e.keyCode === 123) {
+      e.preventDefault();
+      return false;
+    }
+    // Ctrl+Shift+I / Cmd+Option+I (Inspect Element)
+    // Ctrl+Shift+J / Cmd+Option+J (Console)
+    // Ctrl+Shift+C / Cmd+Option+C (Inspect)
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
+      e.preventDefault();
+      return false;
+    }
+    // Ctrl+U / Cmd+Option+U (View Source)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
+      e.preventDefault();
+      return false;
+    }
+    // Ctrl+S / Cmd+S (Save page)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      return false;
+    }
+  });
+})();
+
 // ── INITIALIZATION ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initDatePicker();
-  loadSnapshot(currentDate);
+  if (checkAuth()) {
+    initDashboard();
+  }
 });
+
+let isDashboardInitialized = false;
+function initDashboard() {
+  if (isDashboardInitialized) {
+    refreshDashboard();
+    return;
+  }
+  isDashboardInitialized = true;
+  loadSnapshot(currentDate);
+}
 
 function initDatePicker() {
   const dateInput = document.getElementById('reportDatePicker');
