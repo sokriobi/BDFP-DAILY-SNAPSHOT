@@ -66,20 +66,42 @@ function buildHtmlEmail(snapshot) {
     totZoneWeightedLpc += (lpc * o);
 
     const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fbff';
+    const areas = z.areas || [];
+    const areaRowsHtml = areas.map(a => {
+      const aEcoNum = parseFloat(a.eco) || 0;
+      const aEcoBg = aEcoNum >= 70 ? '#e8f8f0' : (aEcoNum >= 50 ? '#fef3e2' : '#feecef');
+      const aEcoColor = aEcoNum >= 70 ? '#059669' : (aEcoNum >= 50 ? '#d97706' : '#e11d48');
+      const aAmt = a.total_amount || 0;
+      const aV = a.total_visit || 0;
+      return `
+        <tr style="border-bottom: 1px solid #f1f5f9; background: #fafafa;">
+          <td style="padding: 6px 12px 6px 26px; color: #475569; font-size: 11.5px;">
+            <span style="color:#94a3b8; margin-right:4px;">↳</span> ${a.name}
+          </td>
+          <td style="padding: 6px 12px; color: #64748b; text-align: right; font-size: 11.5px; font-family: monospace;">${(aV || 0).toLocaleString()}</td>
+          <td style="padding: 6px 12px; color: #0284c7; text-align: right; font-weight: 600; font-size: 11.5px; font-family: monospace;">${formatTaka(aAmt)}</td>
+          <td style="padding: 6px 12px; text-align: right;">
+            <span style="display: inline-block; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-size: 10.5px; background: ${aEcoBg}; color: ${aEcoColor};">${a.eco}</span>
+          </td>
+          <td style="padding: 6px 12px; color: #64748b; text-align: right; font-size: 11.5px; font-family: monospace;">${a.avg_lpc || '0.0'}</td>
+        </tr>
+      `;
+    }).join('');
 
     return `
       <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBg};">
-        <td style="padding: 10px 12px; color: #1e293b; font-weight: 600; font-size: 13px;">
+        <td style="padding: 10px 12px; color: #1e293b; font-weight: 700; font-size: 13px;">
           <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#00AEEF; margin-right:6px;"></span>
-          ${z.zone}
+          ${z.zone} ${areas.length > 0 ? `<span style="font-size:10px; color:#64748b; font-weight:normal;">(${areas.length} areas)</span>` : ''}
         </td>
-        <td style="padding: 10px 12px; color: #334155; text-align: right; font-size: 13px; font-family: monospace;">${(v || 0).toLocaleString()}</td>
+        <td style="padding: 10px 12px; color: #334155; text-align: right; font-size: 13px; font-family: monospace; font-weight:600;">${(v || 0).toLocaleString()}</td>
         <td style="padding: 10px 12px; color: #0284c7; text-align: right; font-weight: 700; font-size: 13px; font-family: monospace;">${formatTaka(amt)}</td>
         <td style="padding: 10px 12px; text-align: right;">
           <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 12px; background: ${ecoBg}; color: ${ecoColor};">${z.eco}</span>
         </td>
         <td style="padding: 10px 12px; color: #334155; text-align: right; font-size: 13px; font-family: monospace;">${z.avg_lpc || '0.0'}</td>
       </tr>
+      ${areaRowsHtml}
     `;
   }).join('');
 

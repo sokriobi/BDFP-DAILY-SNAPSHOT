@@ -292,7 +292,33 @@ function renderKpiCards(kpis) {
   }
 }
 
-// ── RENDER ZONE-WISE PERFORMANCE TABLE ───────────────────────────────
+// ── RENDER ZONE-WISE PERFORMANCE TABLE (WITH AREA EXPAND/COLLAPSE) ────────
+let isAllAreasExpanded = false;
+
+window.toggleZoneRow = function(zoneIdx) {
+  const rows = document.querySelectorAll(`.area-subrow-${zoneIdx}`);
+  const chevron = document.getElementById(`zoneChevron-${zoneIdx}`);
+  if (rows.length === 0) return;
+  const isCurrentlyHidden = rows[0].classList.contains('hidden');
+  rows.forEach(r => r.classList.toggle('hidden', !isCurrentlyHidden));
+  if (chevron) {
+    chevron.textContent = isCurrentlyHidden ? '▼' : '▶';
+  }
+};
+
+window.toggleAllAreas = function() {
+  isAllAreasExpanded = !isAllAreasExpanded;
+  const allAreaRows = document.querySelectorAll('.area-subrow');
+  const chevrons = document.querySelectorAll('.zone-chevron');
+  const btnIcon = document.getElementById('toggleAreasIcon');
+  const btnText = document.getElementById('toggleAreasText');
+
+  allAreaRows.forEach(r => r.classList.toggle('hidden', !isAllAreasExpanded));
+  chevrons.forEach(c => c.textContent = isAllAreasExpanded ? '▼' : '▶');
+  if (btnIcon) btnIcon.textContent = isAllAreasExpanded ? '▼' : '▶';
+  if (btnText) btnText.textContent = isAllAreasExpanded ? 'Collapse All Areas' : 'Expand All Areas';
+};
+
 function renderZoneTable(zones) {
   const tbody = document.getElementById('zoneTableBody');
   const tfoot = document.getElementById('zoneTableFoot');
@@ -313,17 +339,42 @@ function renderZoneTable(zones) {
     return `৳${Math.round(v).toLocaleString()}`;
   }
 
-  tbody.innerHTML = sorted.map(z => {
+  tbody.innerHTML = sorted.map((z, idx) => {
     const ecoNum = parseFloat(z.eco) || 0;
     const ecoClass = ecoNum >= 70 ? 'eco-good' : (ecoNum >= 50 ? 'eco-mid' : 'eco-low');
     const amt = z.total_amount || 0;
+    const areas = z.areas || [];
+
+    const areaRowsHtml = areas.map(a => {
+      const aEcoNum = parseFloat(a.eco) || 0;
+      const aEcoClass = aEcoNum >= 70 ? 'eco-good' : (aEcoNum >= 50 ? 'eco-mid' : 'eco-low');
+      const aAmt = a.total_amount || 0;
+      return `
+        <tr class="area-subrow area-subrow-${idx} ${isAllAreasExpanded ? '' : 'hidden'}">
+          <td>
+            <div class="area-tag">
+              <span class="area-tree-branch">↳</span>
+              <span class="area-name">${escapeHtml(a.name)}</span>
+            </div>
+          </td>
+          <td class="td-num">${(a.total_visit || 0).toLocaleString()}</td>
+          <td class="td-num" title="৳${Math.round(aAmt).toLocaleString()}">${fmtTk(aAmt)}</td>
+          <td class="td-num">
+            <span class="eco-pill ${aEcoClass}">${a.eco}</span>
+          </td>
+          <td class="td-num">${a.avg_lpc || '0.0'}</td>
+        </tr>
+      `;
+    }).join('');
 
     return `
-      <tr>
+      <tr class="zone-row" onclick="toggleZoneRow(${idx})" title="Click to view/hide Areas under ${escapeHtml(z.zone)}">
         <td>
           <div class="zone-tag">
+            <span class="zone-chevron" id="zoneChevron-${idx}">${isAllAreasExpanded ? '▼' : '▶'}</span>
             <span class="zone-dot"></span>
-            <span>${escapeHtml(z.zone)}</span>
+            <span class="zone-name">${escapeHtml(z.zone)}</span>
+            ${areas.length > 0 ? `<span class="zone-area-badge">${areas.length} areas</span>` : ''}
           </div>
         </td>
         <td class="td-num">${(z.total_visit || 0).toLocaleString()}</td>
@@ -333,6 +384,7 @@ function renderZoneTable(zones) {
         </td>
         <td class="td-num">${z.avg_lpc || '0.0'}</td>
       </tr>
+      ${areaRowsHtml}
     `;
   }).join('');
 

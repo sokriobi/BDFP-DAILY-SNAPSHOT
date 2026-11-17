@@ -234,6 +234,35 @@ function resolveZone(t) {
   return 'Others';
 }
 
+// ─── Area Resolution Helpers (29 NCCP Areas under 7 Regions) ───────────────
+function getAreaDefinitions(territories) {
+  const areaById = {};
+  territories.forEach(t => {
+    const self = (t.ancestors_and_self || []).find(a => a.depth === 0);
+    const parent = (t.ancestors_and_self || []).find(a => a.depth === -1);
+    if (self && parent && zoneIds[parent.name] && self.territory_type_id === 4) {
+      areaById[String(self.id)] = {
+        id: String(self.id),
+        name: self.name,
+        code: self.code || '',
+        regionId: parent.id,
+        regionName: parent.name
+      };
+    }
+  });
+  return areaById;
+}
+
+function resolveArea(tObj, areaById) {
+  if (!tObj) return null;
+  const anc = tObj.ancestors_and_self || [];
+  for (let i = 0; i < anc.length; i++) {
+    const aId = String(anc[i].id);
+    if (areaById[aId]) return areaById[aId];
+  }
+  return null;
+}
+
 function getYesterdayDateStr() {
   const d = new Date();
   d.setMinutes(d.getMinutes() + d.getTimezoneOffset() + 360); // UTC+6 BD time
@@ -273,7 +302,7 @@ function extractRows(data) {
 async function generateSnapshot(date, forceFresh = false) {
   if (!forceFresh) {
     const cached = fromSnapshotCache(date);
-    if (cached && cached.kpis && cached.zones && cached.zones[0]?.total_amount !== undefined) {
+    if (cached && cached.kpis && cached.zones && cached.zones[0]?.total_amount !== undefined && cached.zones[0]?.areas) {
       return cached;
     }
   }
@@ -283,6 +312,7 @@ async function generateSnapshot(date, forceFresh = false) {
 
   // Step 1: Territories (Instant from cache)
   const territories = await getTerritories();
+  const areaById = getAreaDefinitions(territories);
   const tMap = {};
   territories.forEach(t => {
     if (t.id) tMap[String(t.id)] = t;
@@ -291,8 +321,18 @@ async function generateSnapshot(date, forceFresh = false) {
     if (t.territory) tMap[t.territory.toLowerCase()] = t;
   });
 
-  // Step 2: Concurrently fetch Official Sokrio endpoints (checkin visits, orders, amount, attendance, order export)
+  // Step 2: Concurrently fetch Official Sokrio endpoints (checkin visits, orders, amount, attendance, order export, area visits)
   console.log('   Fetching official Sokrio BDFP analytics endpoints concurrently...');
+
+  const areaVisitsPromise = Promise.all(Object.values(areaById).map(async area => {
+    try {
+      const res = await apiGet(`${BASE_URL}/api/v1/daily-reports?range=${date},${date}&territory_id=${area.id}&parent_id=${area.id}&initial=true&only=outletsVisited&is_report=1`);
+      const v = parseInt(res?.dailyReports?.outletsVisited?.[0]?.value || 0, 10) || 0;
+      return [area.id, v];
+    } catch (e) {
+      return [area.id, 0];
+    }
+  }));
 
   const zoneOfficialPromises = targetOrder.map(async name => {
     const pId = zoneIds[name];
@@ -318,7 +358,8 @@ async function generateSnapshot(date, forceFresh = false) {
     orderRes,
     outlet7dRes,
     deptRes,
-    uRes
+    uRes,
+    areaVisitsEntries
   ] = await Promise.allSettled([
     apiGet(`${BASE_URL}/api/v1/checkin-report?range=${date},${date}&per_page=1`),
     (async () => {
@@ -371,12 +412,14 @@ async function generateSnapshot(date, forceFresh = false) {
       } catch (e) {
         return [];
       }
-    })()
+    })(),
+    areaVisitsPromise
   ]);
 
   const natCheckinData = natCheckinRes.status === 'fulfilled' ? natCheckinRes.value : {};
   const natDailyData = natDailyRes.status === 'fulfilled' ? natDailyRes.value : {};
   const zoneOfficialMetrics = Object.fromEntries(zoneOfficialEntries.status === 'fulfilled' ? zoneOfficialEntries.value : []);
+  const areaVisitsMap = Object.fromEntries(areaVisitsEntries.status === 'fulfilled' ? areaVisitsEntries.value : []);
   const orderBuffer = orderRes.status === 'fulfilled' ? orderRes.value : null;
   const outlet7dBuffer = outlet7dRes.status === 'fulfilled' ? outlet7dRes.value : null;
   const users = uRes.status === 'fulfilled' ? uRes.value : [];
@@ -419,6 +462,15 @@ async function generateSnapshot(date, forceFresh = false) {
     zoneLinesMap[z] = 0;
   });
 
+  const areaOrdersMap = {};
+  const areaAmountsMap = {};
+  const areaLinesMap = {};
+  Object.keys(areaById).forEach(aId => {
+    areaOrdersMap[aId] = new Set();
+    areaAmountsMap[aId] = 0;
+    areaLinesMap[aId] = 0;
+  });
+
   let exportTotalAmount = 0;
   const exportTotalOrders = new Set();
 
@@ -449,6 +501,7 @@ async function generateSnapshot(date, forceFresh = false) {
 
           const tObj = tMap[tCode] || tMap[tName];
           const zName = resolveZone(tObj);
+          const aObj = resolveArea(tObj, areaById);
 
           if (tid) exportTotalOrders.add(tid);
           exportTotalAmount += amt;
@@ -457,6 +510,12 @@ async function generateSnapshot(date, forceFresh = false) {
             if (tid) zoneOrdersMap[zName].add(tid);
             zoneAmountsMap[zName] += amt;
             if (tid) zoneLinesMap[zName]++;
+          }
+
+          if (aObj && areaOrdersMap[aObj.id]) {
+            if (tid) areaOrdersMap[aObj.id].add(tid);
+            areaAmountsMap[aObj.id] += amt;
+            if (tid) areaLinesMap[aObj.id]++;
           }
 
           // Category matrix
@@ -513,13 +572,36 @@ async function generateSnapshot(date, forceFresh = false) {
     const eco = v > 0 ? ((ord / v) * 100).toFixed(1) : '0.0';
     const avgLpc = ord > 0 ? (lines / ord).toFixed(1) : '0.0';
 
+    const zoneAreas = Object.values(areaById)
+      .filter(a => a.regionName === name)
+      .map(a => {
+        const aVisit = areaVisitsMap[a.id] || 0;
+        const aOrd = areaOrdersMap[a.id] ? areaOrdersMap[a.id].size : 0;
+        const aAmt = areaAmountsMap[a.id] || 0;
+        const aLines = areaLinesMap[a.id] || 0;
+        const aEco = aVisit > 0 ? ((aOrd / aVisit) * 100).toFixed(1) : '0.0';
+        const aAvgLpc = aOrd > 0 ? (aLines / aOrd).toFixed(1) : '0.0';
+        return {
+          id: a.id,
+          name: a.name,
+          code: a.code,
+          total_visit: aVisit,
+          total_order: aOrd,
+          total_amount: aAmt,
+          eco: `${aEco}%`,
+          avg_lpc: aAvgLpc
+        };
+      })
+      .sort((a, b) => (b.total_visit || 0) - (a.total_visit || 0));
+
     return {
       zone: name,
       total_visit: v,
       total_order: ord,
       total_amount: amt,
       eco: `${eco}%`,
-      avg_lpc: avgLpc
+      avg_lpc: avgLpc,
+      areas: zoneAreas
     };
   }).sort((a, b) => b.total_visit - a.total_visit);
 

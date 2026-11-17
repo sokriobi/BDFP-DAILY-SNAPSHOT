@@ -433,6 +433,86 @@ body {
 .eco-mid  { background: rgba(245,158,11,0.10);  color: #d97706; }
 .eco-low  { background: rgba(244,63,94,0.10);   color: #e11d48; }
 
+/* ─── Expand/Collapse All Areas Button ─── */
+.btn-toggle-areas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 174, 239, 0.08);
+  color: #0284c7;
+  border: 1px solid rgba(0, 174, 239, 0.25);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.btn-toggle-areas:hover {
+  background: rgba(0, 174, 239, 0.16);
+  border-color: rgba(0, 174, 239, 0.45);
+}
+.btn-toggle-areas #toggleAreasIcon {
+  font-size: 0.65rem;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+/* ─── Zone Row & Chevron Interactive ─── */
+.zone-row {
+  cursor: pointer;
+  user-select: none;
+}
+.zone-chevron {
+  font-size: 0.62rem;
+  color: #64748b;
+  width: 12px;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.zone-area-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #0284c7;
+  background: rgba(2, 132, 199, 0.08);
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+
+/* ─── Area Sub-rows ─── */
+.area-subrow {
+  background: #f8fafc !important;
+}
+.area-subrow td {
+  padding: 8px 14px 8px 18px !important;
+  font-size: 0.79rem !important;
+  color: #475569 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03) !important;
+}
+.area-subrow:hover td {
+  background: rgba(0, 174, 239, 0.05) !important;
+}
+.area-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 18px;
+}
+.area-tree-branch {
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.area-name {
+  font-weight: 500;
+  color: #334155;
+}
+.area-subrow.hidden {
+  display: none !important;
+}
+
 /* CATEGORY MATRIX */
 .matrix-table-wrap { flex: 1; overflow-x: auto; overflow-y: auto; margin-top: 4px; }
 

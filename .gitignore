@@ -27,6 +27,9 @@ bdfp_snapshot_*.json
 t_cache.json
 *.tmp
 
+# Nested duplicates
+BDFP-DAILY-SNAPSHOT-main/
+
 # OS files
 .DS_Store
 Thumbs.db
