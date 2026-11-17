@@ -1,14 +1,20 @@
 const nodemailer = require('nodemailer');
 
+const DEFAULT_RECIPIENTS = 'mahadi.sokrio@gmail.com,akib@sokrio.com,sahiuddin@sokrio.com,ar.atik@brac.net';
+const DEFAULT_SMTP_HOST = 'smtp.gmail.com';
+const DEFAULT_SMTP_PORT = 587;
+const DEFAULT_SMTP_USER = 'sokriobi@gmail.com';
+const DEFAULT_SMTP_PASS = 'tuqmwunyrwntjesh';
+
 function createEmailTransporter() {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const host = process.env.SMTP_HOST || DEFAULT_SMTP_HOST;
+  const port = parseInt(process.env.SMTP_PORT || String(DEFAULT_SMTP_PORT), 10);
   const secure = process.env.SMTP_SECURE === 'true' || port === 465;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER || DEFAULT_SMTP_USER;
+  const pass = process.env.SMTP_PASS || DEFAULT_SMTP_PASS;
 
   if (!user || !pass) {
-    console.warn('⚠️ SMTP_USER or SMTP_PASS not set in .env. Email sending will be skipped or simulated.');
+    console.warn('⚠️ SMTP credentials not available. Email sending skipped.');
     return null;
   }
 
@@ -363,15 +369,15 @@ function buildHtmlEmail(snapshot) {
 }
 
 async function sendDailyReportEmail(snapshot, recipientEmails) {
-  const recipients = recipientEmails || process.env.REPORT_TO_EMAILS;
+  const recipients = recipientEmails || process.env.REPORT_TO_EMAILS || DEFAULT_RECIPIENTS;
   if (!recipients) {
-    console.warn('⚠️ No recipients specified for daily email report. Set REPORT_TO_EMAILS in .env');
+    console.warn('⚠️ No recipients specified for daily email report.');
     return { success: false, message: 'No recipients configured' };
   }
 
   const transporter = createEmailTransporter();
   if (!transporter) {
-    return { success: false, message: 'SMTP not configured in .env' };
+    return { success: false, message: 'SMTP not configured' };
   }
 
   const dObj = new Date((snapshot.date || '') + 'T00:00:00');
@@ -379,7 +385,7 @@ async function sendDailyReportEmail(snapshot, recipientEmails) {
   const subject = `📊 BDFP — CEO Daily Snapshot Report (${dateFormatted})`;
   const htmlContent = buildHtmlEmail(snapshot);
 
-  const senderAddress = `"BDFP Intelligence" <${process.env.SMTP_USER}>`;
+  const senderAddress = `"BDFP Intelligence" <${process.env.SMTP_USER || DEFAULT_SMTP_USER}>`;
   const mailOptions = {
     from: senderAddress,
     to: senderAddress,

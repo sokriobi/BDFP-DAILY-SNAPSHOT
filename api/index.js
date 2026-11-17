@@ -706,7 +706,7 @@ app.get('/api/trigger-snapshot', async (req, res) => {
 app.get('/api/test-email', async (req, res) => {
   try {
     const date = req.query.date || getYesterdayDateStr();
-    const toEmail = req.query.to || process.env.REPORT_TO_EMAILS;
+    const toEmail = req.query.to || process.env.REPORT_TO_EMAILS || 'mahadi.sokrio@gmail.com,akib@sokrio.com,sahiuddin@sokrio.com,ar.atik@brac.net';
     const snapshot = await generateSnapshot(date, true);
 
     // ── Data Validation Gate ──────────────────────────────────────────────
