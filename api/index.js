@@ -324,16 +324,19 @@ async function generateSnapshot(date, forceFresh = false) {
     if (t.territory) tMap[t.territory.toLowerCase()] = t;
   });
 
-  // Step 2: Concurrently fetch Official Sokrio endpoints (checkin visits, orders, amount, attendance, order export, area visits)
+  // Step 2: Concurrently fetch Official Sokrio endpoints (checkin visits, orders, amount, attendance, order export, area official metrics)
   console.log('   Fetching official Sokrio BDFP analytics endpoints concurrently...');
 
-  const areaVisitsPromise = Promise.all(Object.values(areaById).map(async area => {
+  const areaOfficialPromises = Promise.all(Object.values(areaById).map(async area => {
     try {
-      const res = await apiGet(`${BASE_URL}/api/v1/daily-reports?range=${date},${date}&territory_id=${area.id}&parent_id=${area.id}&initial=true&only=outletsVisited&is_report=1`);
-      const v = parseInt(res?.dailyReports?.outletsVisited?.[0]?.value || 0, 10) || 0;
-      return [area.id, v];
+      const res = await apiGet(`${BASE_URL}/api/v1/daily-reports?range=${date},${date}&territory_id=${area.id}&parent_id=${area.id}&initial=true&only=outletsVisited,orderCreated,orderAmount&is_report=1`);
+      const d = res?.dailyReports;
+      const v = parseInt(d?.outletsVisited?.[0]?.value || 0, 10) || 0;
+      const ord = parseInt(d?.orderCreated?.[0]?.value || 0, 10) || 0;
+      const amt = parseFloat(d?.orderAmount?.[0]?.value || 0) || 0;
+      return [area.id, { visit: v, orders: ord, amount: amt }];
     } catch (e) {
-      return [area.id, 0];
+      return [area.id, { visit: 0, orders: 0, amount: 0 }];
     }
   }));
 
@@ -416,13 +419,13 @@ async function generateSnapshot(date, forceFresh = false) {
         return [];
       }
     })(),
-    areaVisitsPromise
+    areaOfficialPromises
   ]);
 
   const natCheckinData = natCheckinRes.status === 'fulfilled' ? natCheckinRes.value : {};
   const natDailyData = natDailyRes.status === 'fulfilled' ? natDailyRes.value : {};
   const zoneOfficialMetrics = Object.fromEntries(zoneOfficialEntries.status === 'fulfilled' ? zoneOfficialEntries.value : []);
-  const areaVisitsMap = Object.fromEntries(areaVisitsEntries.status === 'fulfilled' ? areaVisitsEntries.value : []);
+  const areaOfficialMetrics = Object.fromEntries(areaVisitsEntries.status === 'fulfilled' ? areaVisitsEntries.value : []);
   const orderBuffer = orderRes.status === 'fulfilled' ? orderRes.value : null;
   const outlet7dBuffer = outlet7dRes.status === 'fulfilled' ? outlet7dRes.value : null;
   const users = uRes.status === 'fulfilled' ? uRes.value : [];
@@ -578,9 +581,10 @@ async function generateSnapshot(date, forceFresh = false) {
     const zoneAreas = Object.values(areaById)
       .filter(a => a.regionName === name)
       .map(a => {
-        const aVisit = areaVisitsMap[a.id] || 0;
-        const aOrd = areaOrdersMap[a.id] ? areaOrdersMap[a.id].size : 0;
-        const aAmt = areaAmountsMap[a.id] || 0;
+        const offA = areaOfficialMetrics[a.id] || { visit: 0, orders: 0, amount: 0 };
+        const aVisit = offA.visit > 0 ? offA.visit : 0;
+        const aOrd = offA.orders > 0 ? offA.orders : (areaOrdersMap[a.id] ? areaOrdersMap[a.id].size : 0);
+        const aAmt = offA.amount > 0 ? offA.amount : (areaAmountsMap[a.id] || 0);
         const aLines = areaLinesMap[a.id] || 0;
         const aEco = aVisit > 0 ? ((aOrd / aVisit) * 100).toFixed(1) : '0.0';
         const aAvgLpc = aOrd > 0 ? (aLines / aOrd).toFixed(1) : '0.0';
