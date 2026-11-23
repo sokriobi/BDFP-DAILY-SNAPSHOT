@@ -316,7 +316,10 @@ async function generateSnapshot(date, forceFresh = false) {
   const tMap = {};
   territories.forEach(t => {
     if (t.id) tMap[String(t.id)] = t;
-    if (t.code) tMap[String(t.code)] = t;
+    if (t.code) {
+      tMap[String(t.code)] = t;
+      tMap[String(t.code).toLowerCase()] = t;
+    }
     if (t.point_name) tMap[t.point_name.toLowerCase()] = t;
     if (t.territory) tMap[t.territory.toLowerCase()] = t;
   });
@@ -749,4 +752,5 @@ if (!process.env.VERCEL) {
   });
 }
 
+app.generateSnapshot = generateSnapshot;
 module.exports = app;
