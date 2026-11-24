@@ -441,19 +441,31 @@ async function generateSnapshot(date, forceFresh = false) {
       try {
         const d = await apiGet(`${BASE_URL}/api/v1/user-bulk-download`);
         const rows = extractRows(d);
-        const users = rows.filter(r => r.active === 1 || r.status === 'Active')
-          .map(r => ({
+        const activeRows = rows.filter(r => r.active === 1 || r.status === 'Active');
+        const srOnly = activeRows.filter(r => {
+          const role = String(r.roles?.[0]?.name || r.roles?.[0]?.label || r.designation || '').toLowerCase();
+          return role === 'sr' || role.includes('sales representative') || role.includes('dsr');
+        });
+        const usersData = {
+          allUsers: activeRows.map(r => ({
             id: r.employee_id || r.sr_code || r.code || r.id,
             code: r.code || r.sr_code || r.employee_id,
             name: r.name || r.full_name || '',
             territory_id: r.territory?.id || r.territory_id,
-            territory_name: r.territory?.name || r.territory_name || '',
             point_id: r.point_id
-          }));
-        toCache('users', users);
-        return users;
+          })),
+          srUsers: srOnly.map(r => ({
+            id: r.employee_id || r.sr_code || r.code || r.id,
+            code: r.code || r.sr_code || r.employee_id,
+            name: r.name || r.full_name || '',
+            territory_id: r.territory?.id || r.territory_id,
+            point_id: r.point_id
+          }))
+        };
+        toCache('users', usersData);
+        return usersData;
       } catch (e) {
-        return [];
+        return { allUsers: [], srUsers: [] };
       }
     })(),
     areaOfficialPromises,
@@ -466,13 +478,15 @@ async function generateSnapshot(date, forceFresh = false) {
   const areaOfficialMetrics = Object.fromEntries(areaVisitsEntries.status === 'fulfilled' ? areaVisitsEntries.value : []);
   const orderBuffer = orderRes.status === 'fulfilled' ? orderRes.value : null;
   const outlet7dBuffer = outlet7dRes.status === 'fulfilled' ? outlet7dRes.value : null;
-  const users = uRes.status === 'fulfilled' ? uRes.value : [];
+  const usersObj = uRes.status === 'fulfilled' ? uRes.value : { allUsers: [], srUsers: [] };
+  const allUsers = Array.isArray(usersObj) ? usersObj : (usersObj.allUsers || []);
+  const users = Array.isArray(usersObj) ? usersObj : (usersObj.srUsers || []);
   const deptData = deptRes.status === 'fulfilled' ? deptRes.value : null;
   const kpiBuffer = kpiRes.status === 'fulfilled' ? kpiRes.value : null;
 
   // Build SR to Territory lookup
   const srToTerritory = {};
-  users.forEach(u => {
+  allUsers.forEach(u => {
     const code = String(u.code || u.id || '').trim();
     const t = tMap[String(u.territory_id)];
     const z = resolveZone(t);
