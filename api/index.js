@@ -409,7 +409,8 @@ async function generateSnapshot(date, forceFresh = false) {
     outlet7dRes,
     deptRes,
     uRes,
-    areaVisitsEntries
+    areaVisitsEntries,
+    kpiRes
   ] = await Promise.allSettled([
     apiGet(`${BASE_URL}/api/v1/checkin-report?range=${date},${date}&per_page=1`),
     (async () => {
@@ -441,29 +442,22 @@ async function generateSnapshot(date, forceFresh = false) {
         const d = await apiGet(`${BASE_URL}/api/v1/user-bulk-download`);
         const rows = extractRows(d);
         const users = rows.filter(r => r.active === 1 || r.status === 'Active')
-          .map(r => {
-            const roleName = r.roles?.[0]?.name || r.roles?.[0]?.label || r.designation || '';
-            return {
-              id: r.employee_id || r.sr_code || r.code || r.id,
-              code: r.code || r.sr_code || r.employee_id,
-              name: r.name || r.full_name || '',
-              designation: roleName,
-              territory_id: r.territory?.id || r.territory_id,
-              territory_name: r.territory?.name || r.territory_name || '',
-              point_id: r.point_id
-            };
-          })
-          .filter(u => {
-            const d = String(u.designation || '').toLowerCase();
-            return d.includes('sales representative') || d === 'sr' || d.includes('dsr') || d === 'rsm' || d.includes('regional sales manager');
-          });
+          .map(r => ({
+            id: r.employee_id || r.sr_code || r.code || r.id,
+            code: r.code || r.sr_code || r.employee_id,
+            name: r.name || r.full_name || '',
+            territory_id: r.territory?.id || r.territory_id,
+            territory_name: r.territory?.name || r.territory_name || '',
+            point_id: r.point_id
+          }));
         toCache('users', users);
         return users;
       } catch (e) {
         return [];
       }
     })(),
-    areaOfficialPromises
+    areaOfficialPromises,
+    apiGet(`https://bdfp.report.sokrio.com/api/v3/kpi-report?range=${date},${date}&territory_id=2&user_id=&basedOn=order&download`, {}, true)
   ]);
 
   const natCheckinData = natCheckinRes.status === 'fulfilled' ? natCheckinRes.value : {};
@@ -474,13 +468,59 @@ async function generateSnapshot(date, forceFresh = false) {
   const outlet7dBuffer = outlet7dRes.status === 'fulfilled' ? outlet7dRes.value : null;
   const users = uRes.status === 'fulfilled' ? uRes.value : [];
   const deptData = deptRes.status === 'fulfilled' ? deptRes.value : null;
+  const kpiBuffer = kpiRes.status === 'fulfilled' ? kpiRes.value : null;
 
-  // Route Outlets Map per Area and per Zone (for Strike Rate = Memo / Route Outlets)
+  // Build SR to Territory lookup
+  const srToTerritory = {};
+  users.forEach(u => {
+    const code = String(u.code || u.id || '').trim();
+    const t = tMap[String(u.territory_id)];
+    const z = resolveZone(t);
+    const a = resolveArea(t, areaById);
+    srToTerritory[code] = {
+      name: u.name,
+      territoryId: u.territory_id,
+      areaId: a?.id,
+      areaName: a?.name,
+      regionName: z
+    };
+  });
+
+  // Route Outlets Map per Area and per Zone (for Strike Rate = Memo / Scheduled Route Outlets)
   const areaRouteOutletsMap = {};
   const zoneRouteOutletsMap = {};
   targetOrder.forEach(z => { zoneRouteOutletsMap[z] = 0; });
   Object.keys(areaById).forEach(aId => { areaRouteOutletsMap[aId] = 0; });
   let totalRouteOutlets = 0;
+
+  if (kpiBuffer) {
+    try {
+      const kpiWb = XLSX.read(kpiBuffer, { type: 'buffer' });
+      const kpiRows = XLSX.utils.sheet_to_json(kpiWb.Sheets[kpiWb.SheetNames[0]], { header: 1 });
+      const nationalSCall = parseFloat(kpiRows[3]?.[10]) || 0;
+      totalRouteOutlets = nationalSCall;
+
+      for (let i = 5; i < kpiRows.length; i++) {
+        const r = kpiRows[i];
+        if (!r || !r[1]) continue;
+        const empCode = String(r[1]).trim();
+        const sCall = parseFloat(r[10]) || 0; // Total S.Call (Scheduled Route Outlets for that day)
+        
+        const sr = srToTerritory[empCode];
+        if (sr && sr.regionName !== 'Others') {
+          if (zoneRouteOutletsMap[sr.regionName] !== undefined) {
+            zoneRouteOutletsMap[sr.regionName] += sCall;
+          }
+          if (sr.areaId && areaRouteOutletsMap[sr.areaId] !== undefined) {
+            areaRouteOutletsMap[sr.areaId] += sCall;
+          }
+        }
+      }
+      console.log(`   📊 Sokrio Official KPI Report loaded: National S.Call (Route Outlets) = ${totalRouteOutlets.toLocaleString()}`);
+    } catch (e) {
+      console.error('KPI report parse error:', e.message);
+    }
+  }
 
   // New Outlets (last 7 days) — from search-outlet-report JSON
   let newOutlets7d = 0;
@@ -549,8 +589,6 @@ async function generateSnapshot(date, forceFresh = false) {
           if (n === 'ctn') ctnCol = i;
         });
 
-        const activeRoutesMap = {};
-
         rows.slice(hIdx + 1).forEach(r => {
           const tid = String(r[tidCol] || '').trim();
           const cat = String(r[catCol] || 'Others').trim() || 'Others';
@@ -561,21 +599,6 @@ async function generateSnapshot(date, forceFresh = false) {
           const tObj = tMap[tCode] || tMap[tName];
           const zName = resolveZone(tObj);
           const aObj = resolveArea(tObj, areaById);
-
-          // Track active route for route-based strike rate (Total Outlets on that Route)
-          if (tObj) {
-            const self = (tObj.ancestors_and_self || []).find(a => a.depth === 0) || tObj;
-            const routeTerritory = self.territory_type_id === 6 ? self : (tObj.ancestors_and_self || []).find(a => a.territory_type_id === 6);
-            const routeId = routeTerritory ? String(routeTerritory.id) : (tObj.id ? String(tObj.id) : null);
-            if (routeId && !activeRoutesMap[routeId]) {
-              activeRoutesMap[routeId] = {
-                id: routeId,
-                name: routeTerritory ? routeTerritory.name : (tObj.name || tName),
-                zName,
-                aObj
-              };
-            }
-          }
 
           if (tid) exportTotalOrders.add(tid);
           exportTotalAmount += amt;
@@ -605,23 +628,6 @@ async function generateSnapshot(date, forceFresh = false) {
             categoryMap[cat].zones[zName] = (categoryMap[cat].zones[zName] || 0) + amt;
           }
         });
-
-        // Resolve total outlets for all active routes worked on today (from Sokrio Report API)
-        const activeRouteIds = Object.keys(activeRoutesMap);
-        const routeOutletsMap = await ensureRouteOutlets(activeRouteIds);
-
-        Object.values(activeRoutesMap).forEach(({ id, zName, aObj }) => {
-          const outlets = routeOutletsMap[id] || 0;
-          totalRouteOutlets += outlets;
-          if (zName && zoneRouteOutletsMap[zName] !== undefined) {
-            zoneRouteOutletsMap[zName] += outlets;
-          }
-          if (aObj && areaRouteOutletsMap[aObj.id] !== undefined) {
-            areaRouteOutletsMap[aObj.id] += outlets;
-          }
-        });
-
-        console.log(`   🛣️  Active Routes today: ${activeRouteIds.length} routes, Total Route Outlets: ${totalRouteOutlets.toLocaleString()}`);
 
         if (totalOrderAmount === 0 && exportTotalAmount > 0) totalOrderAmount = exportTotalAmount;
         if (totalOrders === 0 && exportTotalOrders.size > 0) totalOrders = exportTotalOrders.size;
