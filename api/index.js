@@ -497,26 +497,26 @@ async function generateSnapshot(date, forceFresh = false) {
     try {
       const kpiWb = XLSX.read(kpiBuffer, { type: 'buffer' });
       const kpiRows = XLSX.utils.sheet_to_json(kpiWb.Sheets[kpiWb.SheetNames[0]], { header: 1 });
-      const nationalOutlets = parseFloat(kpiRows[3]?.[4]) || 142390;
-      totalRouteOutlets = nationalOutlets;
+      const nationalSCall = parseFloat(kpiRows[3]?.[10]) || 17518;
+      totalRouteOutlets = nationalSCall;
 
       for (let i = 5; i < kpiRows.length; i++) {
         const r = kpiRows[i];
         if (!r || !r[1]) continue;
         const empCode = String(r[1]).trim();
-        const outlets = parseFloat(r[4]) || 0; // Total Outlet column (Col 4, e.g. Shourov Shil = 274, National = 142,390)
+        const sCall = parseFloat(r[10]) || 0; // Total S.Call (Scheduled Route Outlets for that day)
         
         const sr = srToTerritory[empCode];
         if (sr && sr.regionName !== 'Others') {
           if (zoneRouteOutletsMap[sr.regionName] !== undefined) {
-            zoneRouteOutletsMap[sr.regionName] += outlets;
+            zoneRouteOutletsMap[sr.regionName] += sCall;
           }
           if (sr.areaId && areaRouteOutletsMap[sr.areaId] !== undefined) {
-            areaRouteOutletsMap[sr.areaId] += outlets;
+            areaRouteOutletsMap[sr.areaId] += sCall;
           }
         }
       }
-      console.log(`   📊 Sokrio Official KPI Report loaded: National Total Outlets = ${totalRouteOutlets.toLocaleString()}`);
+      console.log(`   📊 Sokrio Official KPI Report loaded: National Total S.Call (Route Outlets) = ${totalRouteOutlets.toLocaleString()}`);
     } catch (e) {
       console.error('KPI report parse error:', e.message);
     }
