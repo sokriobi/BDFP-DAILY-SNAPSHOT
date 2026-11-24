@@ -486,7 +486,7 @@ async function generateSnapshot(date, forceFresh = false) {
     };
   });
 
-  // Route Outlets Map per Area and per Zone (for Strike Rate = Memo / Scheduled Route Outlets)
+  // Route Outlets Map per Area and per Zone (for Strike Rate = Memo / Total Outlets from KPI Report Col 4)
   const areaRouteOutletsMap = {};
   const zoneRouteOutletsMap = {};
   targetOrder.forEach(z => { zoneRouteOutletsMap[z] = 0; });
@@ -497,26 +497,26 @@ async function generateSnapshot(date, forceFresh = false) {
     try {
       const kpiWb = XLSX.read(kpiBuffer, { type: 'buffer' });
       const kpiRows = XLSX.utils.sheet_to_json(kpiWb.Sheets[kpiWb.SheetNames[0]], { header: 1 });
-      const nationalSCall = parseFloat(kpiRows[3]?.[10]) || 0;
-      totalRouteOutlets = nationalSCall;
+      const nationalOutlets = parseFloat(kpiRows[3]?.[4]) || 142390;
+      totalRouteOutlets = nationalOutlets;
 
       for (let i = 5; i < kpiRows.length; i++) {
         const r = kpiRows[i];
         if (!r || !r[1]) continue;
         const empCode = String(r[1]).trim();
-        const sCall = parseFloat(r[10]) || 0; // Total S.Call (Scheduled Route Outlets for that day)
+        const outlets = parseFloat(r[4]) || 0; // Total Outlet column (Col 4, e.g. Shourov Shil = 274, National = 142,390)
         
         const sr = srToTerritory[empCode];
         if (sr && sr.regionName !== 'Others') {
           if (zoneRouteOutletsMap[sr.regionName] !== undefined) {
-            zoneRouteOutletsMap[sr.regionName] += sCall;
+            zoneRouteOutletsMap[sr.regionName] += outlets;
           }
           if (sr.areaId && areaRouteOutletsMap[sr.areaId] !== undefined) {
-            areaRouteOutletsMap[sr.areaId] += sCall;
+            areaRouteOutletsMap[sr.areaId] += outlets;
           }
         }
       }
-      console.log(`   📊 Sokrio Official KPI Report loaded: National S.Call (Route Outlets) = ${totalRouteOutlets.toLocaleString()}`);
+      console.log(`   📊 Sokrio Official KPI Report loaded: National Total Outlets = ${totalRouteOutlets.toLocaleString()}`);
     } catch (e) {
       console.error('KPI report parse error:', e.message);
     }
