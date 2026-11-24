@@ -111,7 +111,8 @@ function buildHtmlEmail(snapshot) {
     `;
   }).join('');
 
-  const totZoneEco = totZoneVisits > 0 ? ((totZoneOrders / totZoneVisits) * 100).toFixed(1) + '%' : (kpis.eco?.value || '0.0%');
+  const totZoneRouteOutlets = zones.reduce((s, z) => s + (z.route_outlets || 0), 0);
+  const totZoneEco = totZoneRouteOutlets > 0 ? ((totZoneOrders / totZoneRouteOutlets) * 100).toFixed(1) + '%' : (totZoneVisits > 0 ? ((totZoneOrders / totZoneVisits) * 100).toFixed(1) + '%' : (kpis.eco?.value || '0.0%'));
   const totZoneAvgLpc = totZoneOrders > 0 ? (totZoneWeightedLpc / totZoneOrders).toFixed(1) : '0.0';
 
   const zoneFootHtml = `

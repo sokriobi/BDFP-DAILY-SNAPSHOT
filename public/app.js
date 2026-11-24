@@ -407,7 +407,8 @@ function renderZoneTable(zones) {
       weightedLpcSum += (lpc * ord);
     });
 
-    const totEco = totVisits > 0 ? ((totOrders / totVisits) * 100).toFixed(1) + '%' : '0.0%';
+    const totRouteOutlets = sorted.reduce((s, z) => s + (z.route_outlets || 0), 0);
+    const totEco = totRouteOutlets > 0 ? ((totOrders / totRouteOutlets) * 100).toFixed(1) + '%' : (totVisits > 0 ? ((totOrders / totVisits) * 100).toFixed(1) + '%' : '0.0%');
     const totAvgLpc = totOrders > 0 ? (weightedLpcSum / totOrders).toFixed(1) : '0.0';
 
     tfoot.innerHTML = `

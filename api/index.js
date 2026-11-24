@@ -298,6 +298,44 @@ function extractRows(data) {
   return [];
 }
 
+// ─── Route Plans Helper (Fetch & Cache scheduled route outlets per weekday) ───
+async function getRoutePlansForDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00+06:00');
+  const daysMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const dayKey = daysMap[d.getDay()];
+
+  const cacheKey = `route_plans_${dayKey}`;
+  const cached = fromCache(cacheKey, 24 * 60 * 60 * 1000);
+  if (cached && cached.length > 0) return cached;
+
+  try {
+    const firstRes = await apiGet(`${BASE_URL}/api/v1/route-plans?day=${dayKey}&page=1`);
+    const lastPage = firstRes?.last_page || 1;
+    const firstPlans = firstRes?.routePlans || [];
+
+    if (lastPage === 1) {
+      toCache(cacheKey, firstPlans);
+      return firstPlans;
+    }
+
+    const pagePromises = [];
+    for (let p = 2; p <= lastPage; p++) {
+      pagePromises.push(
+        apiGet(`${BASE_URL}/api/v1/route-plans?day=${dayKey}&page=${p}`)
+          .then(r => r?.routePlans || [])
+          .catch(() => [])
+      );
+    }
+    const otherPages = await Promise.all(pagePromises);
+    const allPlans = [...firstPlans, ...otherPages.flat()];
+    toCache(cacheKey, allPlans);
+    return allPlans;
+  } catch (e) {
+    console.error('Error fetching route plans for', dayKey, e.message);
+    return [];
+  }
+}
+
 // ─── OFFICIAL SOKRIO DATA GENERATOR ───────────────────────────────────────
 async function generateSnapshot(date, forceFresh = false) {
   if (!forceFresh) {
@@ -365,7 +403,8 @@ async function generateSnapshot(date, forceFresh = false) {
     outlet7dRes,
     deptRes,
     uRes,
-    areaVisitsEntries
+    areaVisitsEntries,
+    routePlansRes
   ] = await Promise.allSettled([
     apiGet(`${BASE_URL}/api/v1/checkin-report?range=${date},${date}&per_page=1`),
     (async () => {
@@ -419,7 +458,8 @@ async function generateSnapshot(date, forceFresh = false) {
         return [];
       }
     })(),
-    areaOfficialPromises
+    areaOfficialPromises,
+    getRoutePlansForDate(date)
   ]);
 
   const natCheckinData = natCheckinRes.status === 'fulfilled' ? natCheckinRes.value : {};
@@ -430,6 +470,28 @@ async function generateSnapshot(date, forceFresh = false) {
   const outlet7dBuffer = outlet7dRes.status === 'fulfilled' ? outlet7dRes.value : null;
   const users = uRes.status === 'fulfilled' ? uRes.value : [];
   const deptData = deptRes.status === 'fulfilled' ? deptRes.value : null;
+  const routePlans = routePlansRes?.status === 'fulfilled' && Array.isArray(routePlansRes.value) ? routePlansRes.value : [];
+
+  // Route Outlets Map per Area and per Zone (for Strike Rate = Memo / Route Outlets)
+  const areaRouteOutletsMap = {};
+  const zoneRouteOutletsMap = {};
+  targetOrder.forEach(z => { zoneRouteOutletsMap[z] = 0; });
+  Object.keys(areaById).forEach(aId => { areaRouteOutletsMap[aId] = 0; });
+  let totalRouteOutlets = 0;
+
+  routePlans.forEach(plan => {
+    const tObj = tMap[String(plan.territory_id)];
+    const aObj = resolveArea(tObj, areaById);
+    const zName = resolveZone(tObj);
+    const outlets = parseInt(plan.total_outlets || 0, 10);
+    totalRouteOutlets += outlets;
+    if (aObj && areaRouteOutletsMap[aObj.id] !== undefined) {
+      areaRouteOutletsMap[aObj.id] += outlets;
+    }
+    if (zoneRouteOutletsMap[zName] !== undefined) {
+      zoneRouteOutletsMap[zName] += outlets;
+    }
+  });
 
   // New Outlets (last 7 days) — from search-outlet-report JSON
   let newOutlets7d = 0;
@@ -575,7 +637,8 @@ async function generateSnapshot(date, forceFresh = false) {
     const ord = off.orders || (zoneOrdersMap[name] ? zoneOrdersMap[name].size : 0);
     const amt = off.amount > 0 ? off.amount : (zoneAmountsMap[name] || 0);
     const lines = zoneLinesMap[name] || 0;
-    const eco = v > 0 ? ((ord / v) * 100).toFixed(1) : '0.0';
+    const zRouteOutlets = zoneRouteOutletsMap[name] || 0;
+    const eco = zRouteOutlets > 0 ? ((ord / zRouteOutlets) * 100).toFixed(1) : (v > 0 ? ((ord / v) * 100).toFixed(1) : '0.0');
     const avgLpc = ord > 0 ? (lines / ord).toFixed(1) : '0.0';
 
     const zoneAreas = Object.values(areaById)
@@ -586,7 +649,8 @@ async function generateSnapshot(date, forceFresh = false) {
         const aOrd = offA.orders > 0 ? offA.orders : (areaOrdersMap[a.id] ? areaOrdersMap[a.id].size : 0);
         const aAmt = offA.amount > 0 ? offA.amount : (areaAmountsMap[a.id] || 0);
         const aLines = areaLinesMap[a.id] || 0;
-        const aEco = aVisit > 0 ? ((aOrd / aVisit) * 100).toFixed(1) : '0.0';
+        const aRouteOutlets = areaRouteOutletsMap[a.id] || 0;
+        const aEco = aRouteOutlets > 0 ? ((aOrd / aRouteOutlets) * 100).toFixed(1) : (aVisit > 0 ? ((aOrd / aVisit) * 100).toFixed(1) : '0.0');
         const aAvgLpc = aOrd > 0 ? (aLines / aOrd).toFixed(1) : '0.0';
         return {
           id: a.id,
@@ -595,6 +659,7 @@ async function generateSnapshot(date, forceFresh = false) {
           total_visit: aVisit,
           total_order: aOrd,
           total_amount: aAmt,
+          route_outlets: aRouteOutlets,
           eco: `${aEco}%`,
           avg_lpc: aAvgLpc
         };
@@ -606,6 +671,7 @@ async function generateSnapshot(date, forceFresh = false) {
       total_visit: v,
       total_order: ord,
       total_amount: amt,
+      route_outlets: zRouteOutlets,
       eco: `${eco}%`,
       avg_lpc: avgLpc,
       areas: zoneAreas
@@ -613,10 +679,10 @@ async function generateSnapshot(date, forceFresh = false) {
   }).sort((a, b) => b.total_visit - a.total_visit);
 
   const uniqueVisitedOutlets = totalVisits;
-  const overallStrikeRate = totalVisits > 0 ? ((totalOrders / totalVisits) * 100).toFixed(1) : '0.0';
+  const overallStrikeRate = totalRouteOutlets > 0 ? ((totalOrders / totalRouteOutlets) * 100).toFixed(1) : (totalVisits > 0 ? ((totalOrders / totalVisits) * 100).toFixed(1) : '0.0');
 
-  console.log(`   ✅ National: visits=${totalVisits}, orders=${totalOrders}, strikeRate=${overallStrikeRate}%, amount=৳${Math.round(totalOrderAmount).toLocaleString()}, activeSR=${activeSRCount}/${totalSRCount}`);
-  console.log(`   ✅ Zones: ${zoneList.map(z => z.zone + ': visit=' + z.total_visit + ', ord=' + z.total_order + ', sr=' + z.eco).join(' | ')}`);
+  console.log(`   ✅ National: visits=${totalVisits}, orders=${totalOrders}, routeOutlets=${totalRouteOutlets}, strikeRate=${overallStrikeRate}%, amount=৳${Math.round(totalOrderAmount).toLocaleString()}, activeSR=${activeSRCount}/${totalSRCount}`);
+  console.log(`   ✅ Zones: ${zoneList.map(z => z.zone + ': visit=' + z.total_visit + ', ord=' + z.total_order + ', routeOutlets=' + z.route_outlets + ', sr=' + z.eco).join(' | ')}`);
 
   // Category Matrix (Excluding 'Free' category)
   const filteredCategories = Object.values(categoryMap).filter(c => String(c.name || '').trim().toLowerCase() !== 'free');
@@ -668,7 +734,7 @@ async function generateSnapshot(date, forceFresh = false) {
       },
       eco: {
         value: `${overallStrikeRate}%`,
-        target_label: `Productive Outlet: ${totalOrders.toLocaleString()}`
+        target_label: `Productive: ${totalOrders.toLocaleString()} / ${totalRouteOutlets > 0 ? totalRouteOutlets.toLocaleString() : totalVisits.toLocaleString()} Outlets`
       }
     },
     zones: zoneList,
