@@ -64,31 +64,9 @@ function initScheduler(generateSnapshotFn, getYesterdayDateStrFn) {
   });
 
 
-  // 3. Test Email Dispatch @ 12:45 PM (Today's Test Request)
-  cron.schedule('45 12 * * *', async () => {
-    const yesterday = getYesterdayDateStrFn();
-    console.log(`\n======================================================`);
-    console.log(`📧 [12:45 PM BD TIME] Triggering Email Dispatch for ${yesterday}...`);
-    console.log(`======================================================`);
-    try {
-      const snapshot = await generateSnapshotFn(yesterday, false);
-      if (!snapshot) {
-        console.error(`❌ [12:45 PM] Snapshot data unavailable for ${yesterday}.`);
-        return;
-      }
-      const result = await sendDailyReportEmail(snapshot);
-      console.log(`✅ [12:45 PM] Email send result:`, result);
-    } catch (err) {
-      console.error(`❌ [12:45 PM] Error sending email:`, err.message);
-    }
-  }, {
-    timezone: 'Asia/Dhaka'
-  });
-
-  console.log('✅ Scheduler Active:');
-  console.log('   - 06:00 AM (Asia/Dhaka): Serial Data Fetch & Snapshot Cache Generation');
+  console.log('✅ Scheduler Active (Local Cron Mode):');
+  console.log('   - 05:00 AM (Asia/Dhaka): Serial Data Fetch & Snapshot Cache Generation');
   console.log('   - 10:00 AM (Asia/Dhaka): Automated Daily Email Dispatch to Client/CEO');
-  console.log('   - 12:45 PM (Asia/Dhaka): Special Scheduled Email Dispatch');
 }
 
 module.exports = {

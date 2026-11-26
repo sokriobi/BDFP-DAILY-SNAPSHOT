@@ -861,7 +861,11 @@ const PORT = process.env.PORT || 3001;
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`✅ BDFP Live Report Dashboard running at http://localhost:${PORT}`);
-    initScheduler(generateSnapshot, getYesterdayDateStr);
+    if (process.env.ENABLE_LOCAL_CRON === 'true') {
+      initScheduler(generateSnapshot, getYesterdayDateStr);
+    } else {
+      console.log('⏸️  Local auto-email scheduler disabled (Vercel Cron handles daily 10:00 AM dispatch; set ENABLE_LOCAL_CRON=true to enable locally).');
+    }
   });
 }
 
